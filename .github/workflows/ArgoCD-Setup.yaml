@@ -59,7 +59,7 @@ jobs:
         run: |
           # Use the -f flag to point to the environment-specific values file
           #helm upgrade install --dry-run --debug test .
-          helm upgrade --install Argocd ./argo-cd-9.4.15/argo-cd \
+          helm upgrade --install argocd ./argo-cd-9.4.15/argo-cd \
             --namespace argocd \
             --create-namespace 
             
