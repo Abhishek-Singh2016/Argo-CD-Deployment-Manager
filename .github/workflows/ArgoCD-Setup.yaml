@@ -2,7 +2,7 @@ name: Setup ArgoCD Application
 on:
   push:
     branches:
-      - main
+      - master
   workflow_dispatch:
 
 
@@ -45,11 +45,6 @@ jobs:
         if: success() && steps.verify_cluster.outcome == 'success'
         run: |
             echo "Cluster connection verified. Proceeding with dynamic overrides."
-            cd Environments
-            envsubst < values-${{ github.event.inputs.environment }}-template.yaml > values-prod.yaml
-            cat values-prod.yaml
-            pwd;ls -la;
-            cd ..
       
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -57,7 +52,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      - name: update image pull secret to Kubernetes
+      - name: Deploy ArgoCD Application
         env:
           # This variable tells Helm/Kubectl where to look
           KUBECONFIG: ./kubeconfig.yaml        
