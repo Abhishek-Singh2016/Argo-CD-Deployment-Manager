@@ -4,37 +4,7 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Select Environment'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
-      namespace: 
-        description: 'Kubernetes Namespace'
-        required: true
-      app-name:
-        description: 'Application Name'
-        required: true
-      imageTag:
-        description: 'Docker Image Tag'
-        required: true
-      imageRepository:
-        description: 'Docker Image Repository'
-        required: true
 
-      replica:
-        description: 'Number of Replicas'
-        required: true
-        default: '2'
-      reason:
-        description: 'Reason for Deployment'
-        required: false
-        default: 'Routine update'
 
 jobs:
   deploy:
@@ -74,21 +44,12 @@ jobs:
           KUBECONFIG: ./kubeconfig.yaml
         if: success() && steps.verify_cluster.outcome == 'success'
         run: |
-          cat <<EOF > values-user-overrides.yaml
-          replicaCount: "${{ github.event.inputs.replica }}"
-          image:
-            repository: nginx
-            pullPolicy: IfNotPresent
-            # Overrides the image tag whose default is the chart appVersion.
-            tag: "latest"
-          nameOverride: "abhishek-helm-deployment-${{github.run_number}}"
-          fullnameOverride: "abhishek-helm-deployment-${{github.run_number}}"
-          customAnnotations:
-            deployed-by: "${{ github.actor }}"
-            reason: "${{ github.event.inputs.reason }}"
-          EOF
-          pwd;ls -la;cat values-user-overrides.yaml
-
+            echo "Cluster connection verified. Proceeding with dynamic overrides."
+            cd Environments
+            envsubst < values-${{ github.event.inputs.environment }}-template.yaml > values-prod.yaml
+            cat values-prod.yaml
+            pwd;ls -la;
+            cd ..
       
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -101,21 +62,9 @@ jobs:
           # This variable tells Helm/Kubectl where to look
           KUBECONFIG: ./kubeconfig.yaml        
         run: |
-          export REGISTRY_URL="702175642104.dkr.ecr.us-east-1.amazonaws.com/abhishek-ecr/abhishek-ecr"
-          export ECR_PASSWORD=$(aws ecr get-login-password --region us-east-1)
-          export dockerConfigJson=$(base64 -w 0 <<< "{\"auths\":{\"$REGISTRY_URL\":{\"username\":\"AWS\",\"password\":\"$ECR_PASSWORD\"}}}")          
-          echo "Docker Config JSON: $dockerConfigJson"
-          cd Environments
-          envsubst < values-${{ github.event.inputs.environment }}-template.yaml > values-prod.yaml
-          cat values-prod.yaml
-          pwd;ls -la;
-          cd ..
-
-
           # Use the -f flag to point to the environment-specific values file
           #helm upgrade install --dry-run --debug test .
-          helm upgrade --install helm-app-${{ github.event.inputs.app-name }}-${{ github.event.inputs.environment }} ./app-deploy \
-            --namespace ${{ github.event.inputs.app-name }}-${{ github.event.inputs.environment }} \
-            --create-namespace \
-            -f ./Environments/values-prod.yaml 
+          helm upgrade --install Argocd ./argo-cd-9.4.15/argo-cd \
+            --namespace argocd \
+            --create-namespace 
             
